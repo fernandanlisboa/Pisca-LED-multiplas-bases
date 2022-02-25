@@ -1,66 +1,64 @@
 #include <msp430.h> 
 
+#define CONST_TACCR0 62500;
 
 /**
  * main.c
  */
 
-// bases de tempo
-unsigned int baseT1 = 4000;
-unsigned int baseT2 = 6000;
-unsigned int baseT3 = 10000;
-unsigned int baseT4 = 16000;
+// bases de tempo (em segundos)
+unsigned int baseT1 = 2; //a cada 2s
+unsigned int baseT2 = 3; // a cada 3s
+unsigned int baseT3 = 5; // a cada 4s
+unsigned int baseT4 = 6; // a cada 6s
 
-unsigned int tmpOn = 2000;
-int max = 60000;
-
-int main(void)
-{
-	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
-
-	P1DIR |= 0x0F; // inicializando as portas
-
-
-	int i = 0;
-
-
-    while(1)
-    {
-        if (i == max) // resetando contador para evitar estouro
-            i = 0;
-
-        if (i % tmpOn == 0) { //se tiver alcançado o tempo de duração do LED, ele é desligado
-
-            if ((P1IN & BIT0) == BIT0)
-                P1OUT ^= BIT0;
-            else if (i % baseT1 == 0) // se não, ele será ligado em sua base de tempo
-                P1OUT ^= BIT0;
-
-            if ((P1IN & BIT1) == BIT1)
-                P1OUT ^= BIT1;
-            else if (i % baseT2 == 0)
-                P1OUT ^= BIT1;
-
-            if ((P1IN & BIT2) == BIT2)
-                P1OUT ^= BIT2;
-            else if (i % baseT3 == 0)
-                P1OUT ^= BIT2;
-
-            if ((P1IN & BIT3) == BIT3)
-                P1OUT ^= BIT3;
-            else if (i % baseT4 == 0)
-                P1OUT ^= BIT3;
-        }
-
-
-        i++;
-    }
-
-	return 0;
-}
-
+unsigned int i = 0;
+int max = 6;
 
 // fazer divindo as bases se der o número inteiro, é hora do led ser piscado
 void timerBase(){
+    if (i % baseT1 == 0)
+        P1OUT ^= BIT0;
 
+    if (i % baseT2 == 0)
+        P1OUT ^= BIT1;
+
+    if (i % baseT3 == 0)
+        P1OUT ^= BIT2;
+
+    if (i % baseT4 == 0)
+        P1OUT ^= BIT3;
 }
+
+int main(void)
+{
+    WDTCTL = WDTPW | WDTHOLD;    // stop watchdog timer
+    P1DIR = 0x0F; // inicializando as portas
+
+    BCSCTL1 = CALBC1_1MHZ; // set clock to 1MHz
+    DCOCTL = CALDCO_1MHZ;
+
+    TACTL = TASSEL_2 + ID_3 + MC_3;
+    // MC_1:  TACCR0 + 1
+    // ID_0: 2^3 = 8
+
+    TACCR0 = CONST_TACCR0; //tempo máximo possível do registrador CCR0
+
+    _enable_interrupts();
+    TACCTL0 = CCIE;
+
+    return 0;
+}
+
+#pragma vector=TIMERA0_VECTOR
+__interrupt void Timer_A(void) {
+    P1OUT = 0x00; //desligando os leds ligados!
+    if (i == max){ // resetando contador para evitar estouro
+      i = 0;
+    }
+    i += 1;
+   timerBase();
+   // P1OUT ^= BIT0;
+}
+
+
